@@ -1,58 +1,90 @@
 import "./global.css";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, TouchableOpacity } from 'react-native';
+import { Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
-import { Menu, Bell } from 'lucide-react-native';
+import { Menu, Bell, GraduationCap } from 'lucide-react-native';
 
 // Features
 import { StudentDashboard } from './src/features/dashboard/student/StudentDashboard';
-import { TeacherDashboard } from './src/features/dashboard/teacher/TeacherDashboard';
-import { ManagerDashboard } from './src/features/dashboard/manager/ManagerDashboard';
 import { AdminDashboard } from './src/features/dashboard/admin/AdminDashboard';
+import { ProfileScreen } from './src/features/profile/ProfileScreen';
+import { userApi } from './src/features/profile/api/user-api';
 import { Sidebar } from './src/features/layout/Sidebar';
 import { LoginScreen } from './src/features/auth/LoginScreen';
 
 export default function App() {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState(null); // 'Student', 'Teacher', 'Manager', 'Admin'
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null); // 'Student', 'Admin'
 
   // UI State
   const [activeTab, setActiveTab] = useState('student'); // Controls which dashboard is visible (if logged in)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    checkLoginStatus();
+  }, []);
+
+  const checkLoginStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        setIsAuthLoading(false);
+        return;
+      }
+
+      const response = await userApi.getCurrentUser();
+      const userData = response.data || response;
+      const roleValue = userData.roleId || userData.role_id || userData.role;
+
+      let uRole = 'Student';
+      if (roleValue === 1 || String(roleValue).toLowerCase() === 'admin') uRole = 'Admin';
+      // else logic for manager/teacher removed as requested, redirect all to student if not admin.
+
+      setUserRole(uRole);
+      setActiveTab(uRole.toLowerCase());
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Auto login failed', error);
+      await AsyncStorage.removeItem('token');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
   const handleLoginSuccess = (role) => {
     setIsAuthenticated(true);
     setUserRole(role);
-
-    // Map API role to our internal tab keys
-    // Assuming API returns 'Student', 'Teacher', 'Manager', 'Admin'
-    // We lower case it for our tab keys
-    const tabKey = role ? role.toLowerCase() : 'student';
-    setActiveTab(tabKey);
+    setActiveTab(String(role).toLowerCase());
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsAuthenticated(false);
     setUserRole(null);
     setActiveTab('student');
     setIsSidebarOpen(false);
+    await AsyncStorage.removeItem('token');
   };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'admin':
-        return <AdminDashboard />;
-      case 'teacher':
-        return <TeacherDashboard />;
-      case 'manager':
-        return <ManagerDashboard />;
-      case 'student':
-      default:
-        return <StudentDashboard />;
+      case 'admin': return <AdminDashboard />;
+      case 'profile': return <ProfileScreen />;
+      default: return <StudentDashboard />;
     }
   };
+
+  // Show loading indicator while checking auth token
+  if (isAuthLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
+        <ActivityIndicator size="large" color="#1d4ed8" />
+      </View>
+    );
+  }
 
   // If not authenticated, show Login Screen
   if (!isAuthenticated) {
@@ -72,7 +104,10 @@ export default function App() {
             <Menu color="#374151" size={24} />
           </TouchableOpacity>
 
-          <Text className="font-bold text-lg text-gray-800">EduSystem</Text>
+          <View className="flex-row items-center">
+            <GraduationCap size={24} color="#1d4ed8" />
+            <Text className="font-bold text-lg text-[#0f172a] ml-2">EDU-AI Classroom</Text>
+          </View>
 
           <View className="relative">
             <Bell color="#374151" size={24} />
@@ -90,6 +125,7 @@ export default function App() {
           <Sidebar
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
+            userRole={userRole}
             activeTab={activeTab}
             onNavigate={(tab) => {
               setActiveTab(tab);

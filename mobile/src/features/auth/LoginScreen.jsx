@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, ImageBackground } from 'react-native';
-import { Lock, User, Eye, EyeOff } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Lock, User, Eye, EyeOff, GraduationCap } from 'lucide-react-native';
 import { cn } from '../../lib/utils';
 import { authApi } from './api/auth-api';
 
@@ -25,8 +26,28 @@ export const LoginScreen = ({ onLoginSuccess }) => {
 
 
 
-            // Assuming data.role or data.data.role exists
-            const userRole = data.role || (data.data && data.data.role) || 'Student';
+            // Backend returns response.data which we get as `data` here.
+            // Some backends might wrap the payload inside `{ data: ... }`
+            const responseData = data.data || data;
+            const roleValue = responseData.roleId || responseData.role_id || responseData.role;
+            const token = responseData.token || responseData.accessToken || responseData.access_token || responseData.Token;
+
+            if (token) {
+                await AsyncStorage.setItem('token', token);
+            }
+
+            let userRole = 'Student'; // Mặc định là Student
+
+            // Chuyển đổi mã Role ID sang chữ, theo backend enum: ADMIN: 1, MANAGER: 2, TEACHER: 3, STUDENT: 4
+            if (roleValue === 1 || String(roleValue).toLowerCase() === 'admin') userRole = 'Admin';
+            else if (roleValue === 2 || String(roleValue).toLowerCase() === 'manager') userRole = 'Manager';
+            else if (roleValue === 3 || String(roleValue).toLowerCase() === 'teacher') userRole = 'Teacher';
+            else if (roleValue === 4 || String(roleValue).toLowerCase() === 'student') userRole = 'Student';
+            else if (typeof roleValue === 'string') {
+                userRole = roleValue.charAt(0).toUpperCase() + roleValue.slice(1).toLowerCase();
+            }
+
+            console.log('Detected Role:', userRole, 'Original roleValue:', roleValue);
 
             onLoginSuccess(userRole);
 
@@ -41,9 +62,15 @@ export const LoginScreen = ({ onLoginSuccess }) => {
 
     return (
         <View className="flex-1 bg-white justify-center px-8">
-            <View className="mb-10 items-center">
-                <Text className="text-3xl font-bold text-primary mb-2">EduSystem</Text>
-                <Text className="text-gray-500">Đăng nhập để tiếp tục</Text>
+            <View className="mb-10 w-full items-center">
+                <View className="flex-row items-center mb-6">
+                    <GraduationCap size={44} color="#1d4ed8" />
+                    <View className="ml-3">
+                        <Text className="text-2xl font-black text-[#0f172a]">EDU-AI Classroom</Text>
+                        <Text className="text-sm text-gray-500 font-medium mt-0.5">Học tập đơn giản hơn</Text>
+                    </View>
+                </View>
+                <Text className="text-gray-500 text-sm">Đăng nhập để tiếp tục sử dụng hệ thống</Text>
             </View>
 
             <View className="space-y-4">
