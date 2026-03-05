@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, Dimensions, TouchableWithoutFeedback } from 'react-native';
-import { Home, User, BookOpen, LogOut, X, Shield, GraduationCap } from 'lucide-react-native';
+import { Home, User, BookOpen, LogOut, X, Shield, GraduationCap, FileText, TrendingUp } from 'lucide-react-native';
 import { cn } from '../../lib/utils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -43,13 +43,17 @@ export const Sidebar = ({ isOpen, onClose, activeTab, onNavigate, onLogout, user
     if (!isOpen && slideAnim._value === -SIDEBAR_WIDTH) return null;
 
     const getMenuItems = () => {
-        const role = userRole ? userRole.toLowerCase() : 'student';
+        console.log('[DEBUG] Sidebar Received userRole:', userRole);
+        const role = String(userRole || '').toLowerCase();
         const items = [];
 
         if (role === 'admin') {
             items.push({ key: 'admin', label: 'Bảng điều khiển', icon: Shield });
         } else {
-            items.push({ key: 'student', label: 'Bảng điều khiển', icon: Home });
+            items.push({ key: 'student', label: 'Tổng quan', icon: Home });
+            items.push({ key: 'student_courses', label: 'Khóa học', icon: BookOpen });
+            items.push({ key: 'student_tests', label: 'Bài kiểm tra', icon: FileText });
+            items.push({ key: 'student_progress', label: 'Tiến độ', icon: TrendingUp });
         }
 
         return items;

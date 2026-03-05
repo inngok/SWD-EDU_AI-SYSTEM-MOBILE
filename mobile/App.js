@@ -10,6 +10,7 @@ import { Menu, Bell, GraduationCap } from 'lucide-react-native';
 import { StudentDashboard } from './src/features/dashboard/student/StudentDashboard';
 import { AdminDashboard } from './src/features/dashboard/admin/AdminDashboard';
 import { ProfileScreen } from './src/features/profile/ProfileScreen';
+import { StudentCoursesScreen } from './src/features/course/StudentCoursesScreen';
 import { userApi } from './src/features/profile/api/user-api';
 import { Sidebar } from './src/features/layout/Sidebar';
 import { LoginScreen } from './src/features/auth/LoginScreen';
@@ -37,12 +38,31 @@ export default function App() {
       }
 
       const response = await userApi.getCurrentUser();
-      const userData = response.data || response;
-      const roleValue = userData.roleId || userData.role_id || userData.role;
+      console.log('[AUTH] Auto-login response raw content:', JSON.stringify(response));
 
-      let uRole = 'Student';
-      if (roleValue === 1 || String(roleValue).toLowerCase() === 'admin') uRole = 'Admin';
-      // else logic for manager/teacher removed as requested, redirect all to student if not admin.
+      const userData = response.data?.data || response.data || response;
+
+      // Hàm normalize vai trò cực kỳ mạnh mẽ
+      const extractRole = (data) => {
+        const raw = data.roleId || data.role_id || data.role;
+        console.log('[AUTH] Raw role field found:', JSON.stringify(raw));
+
+        if (!raw) return 'Student';
+
+        // Trích xuất ID và Name từ Object hoặc Giá trị đơn
+        const id = (typeof raw === 'object') ? (raw.id || raw.roleId || 0) : raw;
+        const name = String((typeof raw === 'object') ? (raw.name || raw.code || '') : raw).toLowerCase();
+
+        console.log(`[AUTH] Normalized role details -> ID: ${id}, Name: ${name}`);
+
+        if (id == 1 || id === '1' || name.includes('admin')) return 'Admin';
+        if (id == 3 || id === '3' || name.includes('teacher')) return 'Teacher';
+        if (id == 2 || id === '2' || name.includes('manager')) return 'Manager';
+        return 'Student';
+      };
+
+      const uRole = extractRole(userData);
+      console.log('[AUTH] Auto-login finalized role:', uRole);
 
       setUserRole(uRole);
       setActiveTab(uRole.toLowerCase());
@@ -56,9 +76,25 @@ export default function App() {
   };
 
   const handleLoginSuccess = (role) => {
+    console.log('[AUTH] Login Success handler received raw role:', JSON.stringify(role));
+
+    // Đảm bảo role được chuẩn hóa lần cuối
+    let normalizedRole = 'Student';
+    const roleStr = String(role || '').toLowerCase();
+
+    // Check cả ID number, ID string và Name
+    if (role == 1 || role === '1' || roleStr.includes('admin')) {
+      normalizedRole = 'Admin';
+    } else if (role == 3 || role === '3' || roleStr.includes('teacher')) {
+      normalizedRole = 'Teacher';
+    } else if (role == 2 || role === '2' || roleStr.includes('manager')) {
+      normalizedRole = 'Manager';
+    }
+
+    console.log('[AUTH] Login Success normalized to:', normalizedRole);
     setIsAuthenticated(true);
-    setUserRole(role);
-    setActiveTab(String(role).toLowerCase());
+    setUserRole(normalizedRole);
+    setActiveTab(normalizedRole.toLowerCase());
   };
 
   const handleLogout = async () => {
@@ -70,10 +106,24 @@ export default function App() {
   };
 
   const renderContent = () => {
+    console.log('[DEBUG] Rendering Content for Tab:', activeTab, 'Role:', userRole);
+
     switch (activeTab) {
-      case 'admin': return <AdminDashboard />;
-      case 'profile': return <ProfileScreen />;
-      default: return <StudentDashboard />;
+      case 'admin':
+        return <AdminDashboard />;
+      case 'profile':
+        return <ProfileScreen />;
+      case 'student_courses':
+        return <StudentCoursesScreen />;
+      case 'student_tests':
+        // Placeholder or actual component when ready
+        return <View className="flex-1 justify-center items-center"><Text className="text-gray-500 font-bold">Trang Bài kiểm tra đang phát triển</Text></View>;
+      case 'student_progress':
+        // Placeholder or actual component when ready
+        return <View className="flex-1 justify-center items-center"><Text className="text-gray-500 font-bold">Trang Tiến độ đang phát triển</Text></View>;
+      case 'student':
+      default:
+        return <StudentDashboard />;
     }
   };
 
@@ -86,57 +136,54 @@ export default function App() {
     );
   }
 
-  // If not authenticated, show Login Screen
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaProvider>
-        <LoginScreen onLoginSuccess={handleLoginSuccess} />
-      </SafeAreaProvider>
-    );
-  }
-
   return (
     <SafeAreaProvider>
-      <SafeAreaView className="flex-1 bg-gray-50">
-        {/* Top Header / Navigation */}
-        <View className="flex-row justify-between items-center px-6 pt-4 pb-4 bg-white border-b border-gray-100 z-10">
-          <TouchableOpacity onPress={() => setIsSidebarOpen(true)}>
-            <Menu color="#374151" size={24} />
-          </TouchableOpacity>
+      {!isAuthenticated ? (
+        <SafeAreaView className="flex-1 bg-white">
+          <LoginScreen onLoginSuccess={handleLoginSuccess} />
+        </SafeAreaView>
+      ) : (
+        <SafeAreaView className="flex-1 bg-gray-50">
+          {/* Top Header / Navigation */}
+          <View className="flex-row justify-between items-center px-6 pt-4 pb-4 bg-white border-b border-gray-100 z-10">
+            <TouchableOpacity onPress={() => setIsSidebarOpen(true)}>
+              <Menu color="#374151" size={24} />
+            </TouchableOpacity>
 
-          <View className="flex-row items-center">
-            <GraduationCap size={24} color="#1d4ed8" />
-            <Text className="font-bold text-lg text-[#0f172a] ml-2">EDU-AI Classroom</Text>
+            <View className="flex-row items-center">
+              <GraduationCap size={24} color="#1d4ed8" />
+              <Text className="font-bold text-lg text-[#0f172a] ml-2">EDU-AI Classroom</Text>
+            </View>
+
+            <View className="relative">
+              <Bell color="#374151" size={24} />
+              <View className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+            </View>
           </View>
 
-          <View className="relative">
-            <Bell color="#374151" size={24} />
-            <View className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+          {/* Main Content Area */}
+          <View className="flex-1 relative">
+            {renderContent()}
           </View>
-        </View>
 
-        {/* Main Content Area */}
-        <View className="flex-1 relative">
-          {renderContent()}
-        </View>
+          {/* Sidebar Overlay */}
+          {isSidebarOpen && (
+            <Sidebar
+              isOpen={isSidebarOpen}
+              onClose={() => setIsSidebarOpen(false)}
+              userRole={userRole}
+              activeTab={activeTab}
+              onNavigate={(tab) => {
+                setActiveTab(tab);
+                setIsSidebarOpen(false);
+              }}
+              onLogout={handleLogout}
+            />
+          )}
 
-        {/* Sidebar Overlay */}
-        {isSidebarOpen && (
-          <Sidebar
-            isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)}
-            userRole={userRole}
-            activeTab={activeTab}
-            onNavigate={(tab) => {
-              setActiveTab(tab);
-              setIsSidebarOpen(false);
-            }}
-            onLogout={handleLogout}
-          />
-        )}
-
-        <StatusBar style="dark" />
-      </SafeAreaView>
+          <StatusBar style="dark" />
+        </SafeAreaView>
+      )}
     </SafeAreaProvider>
   );
 }

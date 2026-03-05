@@ -1,101 +1,98 @@
-# Tài Liệu Dự Án Mobile (EduSystem)
+# 📘 Cẩm nang Phát triển Dự án EduSystem Mobile
 
-Tài liệu này tổng hợp lại cấu trúc, công nghệ và các quy tắc phát triển trong dự án EduSystem Mobile.
-
-## 1. Công Nghệ Sử Dụng (Tech Stack)
-
-*   **Framework chính**: [React Native](https://reactnative.dev/) (phiên bản 0.81.5) & [Expo](https://expo.dev/) (SDK 54).
-    *   Lý do: Phát triển đa nền tảng (iOS, Android) nhanh chóng, dễ dàng setup.
-*   **Ngôn ngữ**: JavaScript (ES6+).
-*   **Styling**: [NativeWind](https://www.nativewind.dev/) (TailwindCSS cho React Native).
-    *   Lý do: Viết style nhanh gọn ngay trong JSX thông qua `className`, dễ bảo trì và đồng bộ design system.
-*   **Quản lý API**: [Axios](https://axios-http.com/).
-    *   Lý do: Thư viện HTTP client mạnh mẽ, hỗ trợ interceptors để xử lý global request/response.
-*   **Icons**: [Lucide React Native](https://lucide.dev/).
-    *   Lý do: Bộ icon đẹp, hiện đại, nhất quán.
-*   **Navigation**: Tự custom Sidebar đơn giản (hiện tại), có thể nâng cấp lên `react-navigation` sau này.
+Tài liệu này cung cấp cái nhìn chi tiết về kiến trúc, công nghệ và các kỹ thuật lập trình được áp dụng trong dự án EduSystem Mobile.
 
 ---
 
-## 2. Cấu Trúc Dự Án (Folder Structure)
+## 1. Hệ Sinh Thái Công Nghệ (Core Tech Stack)
 
-Dự án được tổ chức theo kiến trúc **Feature-based** (chia theo tính năng), giúp code dễ đọc, dễ mở rộng và module hóa.
+### ⚛️ React Native & Expo (SDK 54)
+Dự án sử dụng **React Native** giúp viết code một lần bằng JavaScript và chạy được trên cả iOS và Android. **Expo** được dùng làm bộ công cụ hỗ trợ giúp quá trình phát triển (hot reload), chạy thử trên điện thoại thật qua QR code và build app trở nên dễ dàng hơn.
 
+### 🎨 Styling với NativeWind (Tailwind CSS)
+Thay vì viết `StyleSheet.create`, chúng ta dùng `className`.
+- **Ưu điểm**: Tốc độ viết code nhanh, giao diện nhất quán.
+- **Lưu ý quan trọng**: Không phải thuộc tính Tailwind nào cũng chạy trên Mobile (ví dụ: `hover:`, `active:` chỉ hoạt động hạn chế trên một số component). Nếu NativeWind không nhận, hãy dùng inline `style`.
+
+### 📡 Giao tiếp mạng (Axios)
+Sử dụng **Axios Client** (`src/api/axios-client.js`) được bọc bởi Interceptors:
+- Tự động đính kèm `Authorization: Bearer <token>` vào mọi yêu cầu.
+- Xử lý tập trung các lỗi 401 (hết hạn phiên đăng nhập) để đá người dùng ra màn hình Login.
+
+### 🏗️ Icons & Components
+- **Lucide React Native**: Bộ icon chính. Lưu ý import đúng từ `lucide-react-native`.
+- **Reusable Components**: Nằm trong `src/components/`, ví dụ: `ProgressBar`, `Card`.
+
+---
+
+## 2. Kiến Thức React Native Cần Nhớ (Project Level)
+
+### 🧩 Thành phần cơ bản
+- **`View`**: Thay thế cho `<div>`, dùng để bố cục.
+- **`Text`**: Hệ thống KHÔNG tự hiểu chữ nếu không bọc trong `<Text>`.
+- **`TouchableOpacity`**: Thay thế cho `<button>`, hỗ trợ hiệu ứng mờ khi nhấn.
+- **`ScrollView`**: Mặc định diện tích màn hình điện thoại không tự cuộn, phải bọc nội dung trong `ScrollView`.
+
+### 📏 Bí kíp Responsive & Chống Vỡ UI (Layout)
+Mobile có màn hình rất đa dạng (notch, tai thỏ, màn hình dài/ngắn).
+1.  **Flexbox là Vua**: Luôn dùng `flex-row`, `justify-between`, `items-center` để dàn trang. Hạn chế dùng `px` cố định cho chiều rộng.
+2.  **`numberOfLines`**: Cực kỳ quan trọng để chống đè chữ. Luôn giới hạn dòng cho tiêu đề khóa học hoặc tên user.
+3.  **`adjustsFontSizeToFit`**: Tự động co nhỏ chữ nếu text quá dài so với khung.
+4.  **SafeArea**: Sử dụng `SafeAreaView` để nội dung không bị chui vào phần loa thoại hoặc thanh pin.
+
+---
+
+## 3. Hệ Thống Phân Quyền & Vai Trò (Roles)
+
+Dự án có hệ thống phân quyền chặt chẽ dựa trên dữ liệu từ Backend:
+
+### 🎭 Danh sách Roles & ID:
+- **Admin (1)**: Quản trị viên hệ thống.
+- **Manager (2)**: Quản lý chi nhánh/trung tâm.
+- **Teacher (3)**: Giáo viên (có Dashboard riêng).
+- **Student (4)**: Học sinh/Sinh viên (Dashboard tập trung vào tiến độ học tập).
+
+### ⚙️ Cơ chế Chuẩn hóa (Normalization):
+Trong `App.js` và `Sidebar.js`, chúng ta tuyệt đối không tin tưởng 100% vào định dạng role từ API. Luôn dùng hàm chuẩn hóa:
+```javascript
+// Ví dụ logic thực tế trong App.js
+const normalizedRole = role === 1 || String(role).toLowerCase() === 'admin' ? 'Admin' : 'Student';
 ```
-mobile/
-├── App.js                  # Entry point chính của ứng dụng. Quản lý Auth state và Routing cơ bản.
-├── global.css              # File CSS global (cấu hình Tailwind).
-├── src/
-│   ├── api/                # Cấu hình API chung cho toàn dự án.
-│   │   └── axios-client.js # Instance axios global (Base URL, Interceptors).
-│   │
-│   ├── components/         # Các UI component dùng chung (Reusable components).
-│   │   ├── Card.js         # Component thẻ bao ngoài (Container).
-│   │   └── ProgressBar.js  # Thanh tiến trình.
-│   │
-│   ├── features/           # Nơi chứa logic chính, chia theo Tính Năng (Feature).
-│   │   ├── auth/           # Tính năng Xác thực (Đăng nhập, Đăng ký).
-│   │   │   ├── api/        # API service riêng cho Auth.
-│   │   │   │   └── auth-api.js
-│   │   │   └── LoginScreen.js # Màn hình đăng nhập.
-│   │   │
-│   │   ├── dashboard/      # Tính năng Dashboard (Bảng điều khiển).
-│   │   │   ├── admin/      # Dành cho Admin.
-│   │   │   ├── manager/    # Dành cho Quản lý.
-│   │   │   ├── student/    # Dành cho Sinh viên.
-│   │   │   └── teacher/    # Dành cho Giáo viên.
-│   │   │
-│   │   └── layout/         # Các thành phần bố cục chung.
-│   │       └── Sidebar.js  # Menu điều hướng bên trái.
-│   │
-│   └── lib/                # Các hàm tiện ích (Utilities).
-│       └── utils.js        # Hàm cn() để merge class Tailwind.
-```
 
 ---
 
-## 3. Luồng Hoạt Động Chính (Workflows)
+## 4. Cấu Trúc Điều Hướng (Navigation)
 
-### 3.1. Xác Thực & Phân Quyền (Authentication & Authorization)
-1.  **Mở App**: `App.js` kiểm tra biến trạng thái `isAuthenticated`. Mặc định là `false`.
-2.  **Màn Hình Login**: App hiển thị `LoginScreen`.
-3.  **Gọi API**:
-    *   User nhập Email/Pass.
-    *   `LoginScreen` gọi `authApi.login()` -> `axiosClient` gửi POST request tới Server.
-4.  **Xử Lý Sau Login**:
-    *   Server trả về token và thông tin user.
-    *   `handleLoginSuccess` trong `App.js` được gọi.
-    *   Lưu `role` (vai trò) của user.
-    *   Chuyển hướng đến Dashboard tương ứng dựa trên `role` (Admin, Manager, Teacher, Student).
+Hiện tại dự án dùng **Custom Navigation** thông qua `activeTab` trong `App.js`.
 
-### 3.2. Hiển Thị Dashboard (Rendering)
-*   Sử dụng Conditional Rendering (Switch-case) trong `App.js` để hiển thị component Dashboard đúng với quyền của user.
+### 🧭 Luồng hiển thị (Rendering Flow):
+1. **Sidebar.js**: Người dùng nhấn vào Menu -> Gọi hàm `onTabChange('tên_tab')`.
+2. **App.js**: State `activeTab` thay đổi -> Hàm `renderContent()` chạy lại -> Trả về Component tương ứng.
 
-### 3.3. Call API
-*   **Quy tắc**: Không gọi `fetch` hoặc `axios` trực tiếp trong component.
-*   **Cách làm đúng**:
-    1.  Tạo file `api` trong folder feature tương ứng (ví dụ: `src/features/product/api/product-api.js`).
-    2.  Định nghĩa các hàm gọi API tại đó.
-    3.  Import hàm vào component và sử dụng.
-*   **Lợi ích**: Dễ管理的 endpoint, dễ sửa đổi khi Server thay đổi API, code component gọn gàng.
+### 📋 Danh sách Tab học sinh:
+- `student_dashboard`: Tổng quan học tập (Biểu đồ, dead-line).
+- `student_courses`: Danh sách khóa học & Khám phá khóa học mới.
+- `student_tests`: (Coming soon) Bài kiểm tra.
+- `student_progress`: (Coming soon) Lộ trình tiến độ.
 
 ---
 
-## 4. Các Lưu Ý Quan Trọng (Best Practices)
+## 5. Quy trình làm việc với API (Best Practices)
 
-1.  **Class Tailwind**: Sử dụng hàm `cn("class-gốc", className)` khi viết component để có thể ghi đè style từ bên ngoài (overwrite).
-2.  **An Toàn (SafeArea)**: Luôn bọc màn hình chính trong `SafeAreaView` hoặc `SafeAreaProvider` để tránh bị tai thỏ, notch che mất nội dung.
-3.  **Responsive**:
-    *   Hạn chế dùng kích thước cố định (`width: 100`).
-    *   Ưu tiên dùng Flexbox (`flex-1`, `justify-between`) hoặc phần trăm (`w-[48%]`) để giao diện đẹp trên nhiều cỡ màn hình.
-
----
-
-## 5. Hướng Dẫn Chạy Dự Án
-
-*   **Cài đặt thư viện**: `npm install`
-*   **Chạy server phát triển**: `npm start` (hoặc `npx expo start`)
-*   **Xóa cache (khi gặp lỗi lạ)**: `npm start -- --clear`
+Tất cả logic gọi API KHÔNG được viết trực tiếp trong file UI. Phải tuân thủ:
+1.  **Định nghĩa Service**: Tạo file tại `src/features/<feature>/api/<name>-api.js`.
+2.  **Sử dụng Axios Instance**: Luôn import từ `src/api/axios-client`.
+3.  **Xử lý dữ liệu**: Dữ liệu từ API thường nằm sâu trong `response.data.data`. Hãy luôn dùng **Optional Chaining (`?.`)**:
+    ```javascript
+    const name = res.data?.data?.fullName || 'Người dùng';
+    ```
 
 ---
-*Tài liệu được tạo ngày 06/02/2026 bởi Đội ngũ phát triển.*
+
+## 6. Mẹo Debug cho Lập trình viên mới
+- **Xóa Cache**: Nếu giao diện không cập nhật dù đã lưu file, chạy `npm start -- --clear`.
+- **Console Log**: Log role và tab trong `App.js` để biết tại sao màn hình không nhảy (`console.log("Active Tab:", activeTab)`).
+- **Network Debug**: Dùng React Native Debugger hoặc kiểm tra interceptor trong `axios-client.js`.
+
+---
+*Cập nhật lần cuối: 06/03/2026 bởi Antigravity AI.*

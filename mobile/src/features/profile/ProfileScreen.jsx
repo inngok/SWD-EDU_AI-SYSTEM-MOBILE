@@ -52,7 +52,7 @@ export const ProfileScreen = () => {
                     <User size={48} color="#1d4ed8" />
                 </View>
                 <Text className="text-2xl font-bold text-gray-900 mb-1">
-                    {profile.fullName || profile.username || profile.email?.split('@')[0] || 'Chưa cập nhật tên'}
+                    {profile.profile?.fullName || profile.fullName || profile.username || 'Chưa cập nhật tên'}
                 </Text>
                 <View className="bg-blue-50 px-3 py-1 rounded-full">
                     <Text className="text-blue-700 font-medium text-sm">{roleText}</Text>

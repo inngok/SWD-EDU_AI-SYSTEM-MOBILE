@@ -29,26 +29,28 @@ export const LoginScreen = ({ onLoginSuccess }) => {
             // Backend returns response.data which we get as `data` here.
             // Some backends might wrap the payload inside `{ data: ... }`
             const responseData = data.data || data;
-            const roleValue = responseData.roleId || responseData.role_id || responseData.role;
+            const roleRaw = responseData.role || responseData.roleId || responseData.role_id;
+
             const token = responseData.token || responseData.accessToken || responseData.access_token || responseData.Token;
 
             if (token) {
                 await AsyncStorage.setItem('token', token);
             }
 
-            let userRole = 'Student'; // Mặc định là Student
+            // Extract role name or ID carefully
+            let userRole = 'Student';
+            const roleId = (typeof roleRaw === 'object') ? (roleRaw.id || roleRaw.roleId) : roleRaw;
+            const roleName = (typeof roleRaw === 'object') ? (roleRaw.name || roleRaw.code) : String(roleRaw);
 
-            // Chuyển đổi mã Role ID sang chữ, theo backend enum: ADMIN: 1, MANAGER: 2, TEACHER: 3, STUDENT: 4
-            if (roleValue === 1 || String(roleValue).toLowerCase() === 'admin') userRole = 'Admin';
-            else if (roleValue === 2 || String(roleValue).toLowerCase() === 'manager') userRole = 'Manager';
-            else if (roleValue === 3 || String(roleValue).toLowerCase() === 'teacher') userRole = 'Teacher';
-            else if (roleValue === 4 || String(roleValue).toLowerCase() === 'student') userRole = 'Student';
-            else if (typeof roleValue === 'string') {
-                userRole = roleValue.charAt(0).toUpperCase() + roleValue.slice(1).toLowerCase();
+            if (roleId === 1 || String(roleName).toLowerCase().includes('admin')) {
+                userRole = 'Admin';
+            } else if (roleId === 3 || String(roleName).toLowerCase().includes('teacher')) {
+                userRole = 'Teacher';
+            } else if (roleId === 2 || String(roleName).toLowerCase().includes('manager')) {
+                userRole = 'Manager';
             }
 
-            console.log('Detected Role:', userRole, 'Original roleValue:', roleValue);
-
+            console.log('[AUTH] Login detected role:', userRole, 'from raw:', JSON.stringify(roleRaw));
             onLoginSuccess(userRole);
 
         } catch (error) {

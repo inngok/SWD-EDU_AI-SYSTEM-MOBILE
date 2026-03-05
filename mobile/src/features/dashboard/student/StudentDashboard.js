@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { BookOpen, Clock, CheckCircle, ArrowRight, Calendar, Star, TrendingUp, Bell } from 'lucide-react-native';
 import { Card } from '../../../components/Card';
 import { ProgressBar } from '../../../components/ProgressBar';
+import { userApi } from '../../profile/api/user-api';
 
 const stats = [
     { label: 'KHÓA HỌC ĐANG HỌC', value: '0', subValue: '+1 mới', subColor: 'text-blue-600', icon: BookOpen, color: 'blue' },
@@ -78,52 +79,75 @@ const getIconBg = (colorStr) => {
 };
 
 export const StudentDashboard = () => {
+    const [userName, setUserName] = useState('...');
+
+    useEffect(() => {
+        const loadName = async () => {
+            try {
+                const res = await userApi.getCurrentUser();
+                const user = res.data?.data || res.data || res;
+                setUserName(user.profile?.fullName || user.fullName || user.username || 'Học viên');
+            } catch (err) {
+                console.error("Lỗi lấy tên user db", err);
+                setUserName('Học viên');
+            }
+        }
+        loadName();
+    }, []);
+
     return (
         <ScrollView className="flex-1 bg-white px-5 pt-6" contentContainerStyle={{ paddingBottom: 60 }}>
             <View className="space-y-8">
                 {/* Welcome Header */}
-                <View className="mb-2">
-                    <Text className="text-2xl font-black text-gray-800 mb-1">
-                        Chào quay trở lại, <Text className="text-blue-600">Phạm Thu Hương</Text> ! 👋
+                <View className="mb-2 pr-4">
+                    <Text className="text-xl font-black text-gray-800" numberOfLines={1}>
+                        Chào quay trở lại,
+                    </Text>
+                    <Text className="text-xl font-black text-blue-600 mt-1" numberOfLines={1}>
+                        {userName} !
                     </Text>
                 </View>
 
                 {/* Stats Grid */}
-                <View className="flex-row flex-wrap justify-between gap-y-5">
+                <View className="flex-row flex-wrap justify-between">
                     {stats.map((item, idx) => (
-                        <View key={idx} className="w-[47%] bg-white border border-gray-100 p-4 rounded-3xl shadow-sm shadow-gray-200/40">
-                            <View className="flex-row items-center mb-4">
-                                <View className={`w-9 h-9 ${getIconBg(item.color)} rounded-xl items-center justify-center mr-2`}>
-                                    <item.icon size={18} color={getIconColor(item.color)} />
+                        <View key={idx} style={{ width: '48%' }} className="bg-white border border-gray-100 p-2.5 rounded-3xl shadow-sm shadow-gray-200/40 flex-col mb-4">
+                            <View className="flex-row items-start mb-2">
+                                <View className={`w-7 h-7 ${getIconBg(item.color)} rounded-lg items-center justify-center mr-1.5 shrink-0`}>
+                                    <item.icon size={13} color={getIconColor(item.color)} />
                                 </View>
-                                <Text className="flex-1 text-[9px] font-bold text-gray-400 tracking-wider uppercase" numberOfLines={2}>
-                                    {item.label}
-                                </Text>
+                                <View className="flex-1">
+                                    <Text className="text-[7.2px] font-bold text-gray-400 tracking-tight uppercase" numberOfLines={2}>
+                                        {item.label}
+                                    </Text>
+                                </View>
                             </View>
-                            <View>
-                                <Text className="text-[22px] font-black text-gray-800 mb-0.5">{item.value}</Text>
-                                <Text className={`text-[11px] font-bold ${item.subColor}`}>{item.subValue}</Text>
+                            <View className="flex-1 justify-end px-0.5">
+                                <Text className="text-[15px] font-black text-gray-800 mb-0.5" numberOfLines={1} adjustsFontSizeToFit>{item.value}</Text>
+                                <Text className={`text-[8.5px] font-bold ${item.subColor}`} numberOfLines={1}>{item.subValue}</Text>
                             </View>
                         </View>
                     ))}
                 </View>
 
                 {/* Simple Chart Visualization */}
-                <View className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm shadow-gray-200/40">
-                    <View className="flex-row justify-between items-start mb-6">
-                        <View className="flex-row items-center">
-                            <TrendingUp size={18} color="#3b82f6" className="mr-2" />
-                            <View>
-                                <Text className="text-base font-extrabold text-gray-900 mb-1">
+                <View className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm shadow-gray-200/40">
+                    <View className="flex-row justify-between items-start mb-5">
+                        <View className="flex-row items-center flex-1 mr-2">
+                            <View className="bg-blue-50 p-2 rounded-xl mr-2 shrink-0">
+                                <TrendingUp size={14} color="#3b82f6" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-[14px] font-extrabold text-gray-900" numberOfLines={1}>
                                     Phân tích học tập
                                 </Text>
-                                <Text className="text-[10px] uppercase font-bold text-gray-400 tracking-wide">
-                                    Thời gian tập trung trong 7 ngày qua
+                                <Text className="text-[8px] uppercase font-bold text-gray-400 tracking-tight" numberOfLines={1}>
+                                    7 ngày qua
                                 </Text>
                             </View>
                         </View>
-                        <TouchableOpacity className="bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100 flex-row items-center">
-                            <Text className="text-xs font-bold text-gray-600 mr-1">Tuần này</Text>
+                        <TouchableOpacity className="bg-gray-50 px-2 py-1 rounded-full border border-gray-100 shrink-0">
+                            <Text className="text-[9px] font-bold text-gray-600">Tuần này</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -138,7 +162,7 @@ export const StudentDashboard = () => {
                                     >
                                         <View className="absolute bottom-0 left-0 right-0 h-full bg-primary opacity-60" />
                                     </View>
-                                    <Text className="text-xs text-gray-400">{d.day}</Text>
+                                    <Text className="text-[10px] font-bold text-gray-400">{d.day}</Text>
                                 </View>
                             )
                         })}
@@ -158,19 +182,21 @@ export const StudentDashboard = () => {
 
                     <View className="space-y-4">
                         {upcomingDeadlines.map((item, idx) => (
-                            <View key={idx} className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 flex-row">
-                                <View className={`w-1 rounded-full ${item.color} mr-4`}></View>
-                                <View className="flex-1">
-                                    <Text className="text-sm font-extrabold text-gray-800 mb-1">
+                            <View key={idx} className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 flex-row items-center">
+                                <View className={`w-1 h-full rounded-full ${item.color} mr-4 shrink-0`}></View>
+                                <View className="flex-1 mr-2">
+                                    <Text className="text-[13px] font-extrabold text-gray-800 mb-1" numberOfLines={1}>
                                         {item.title}
                                     </Text>
-                                    <Text className="text-[11px] text-gray-500 mb-2 font-medium">
+                                    <Text className="text-[10px] text-gray-500 font-medium" numberOfLines={1}>
                                         {item.course}
                                     </Text>
-                                    <View className="flex-row items-center">
+                                </View>
+                                <View className="items-end shrink-0">
+                                    <View className="flex-row items-center bg-white border border-gray-100 px-2 py-1 rounded-md">
                                         <Clock size={10} color="#9ca3af" className="mr-1" />
-                                        <Text className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                                            {item.date}
+                                        <Text className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+                                            {item.date.split(',')[0]}
                                         </Text>
                                     </View>
                                 </View>
