@@ -14,12 +14,15 @@ import { StudentCoursesScreen } from './src/features/course/StudentCoursesScreen
 import { userApi } from './src/features/profile/api/user-api';
 import { Sidebar } from './src/features/layout/Sidebar';
 import { LoginScreen } from './src/features/auth/LoginScreen';
+import { TeacherCoursesScreen } from './src/features/dashboard/teacher/TeacherCoursesScreen';
+import { TeacherClassesScreen } from './src/features/dashboard/teacher/TeacherClassesScreen';
 
 export default function App() {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState(null); // 'Student', 'Admin'
+  const [userData, setUserData] = useState(null);
 
   // UI State
   const [activeTab, setActiveTab] = useState('student'); // Controls which dashboard is visible (if logged in)
@@ -42,59 +45,81 @@ export default function App() {
 
       const userData = response.data?.data || response.data || response;
 
-      // Hàm normalize vai trò cực kỳ mạnh mẽ
+      // Hàm normalize vai trò cực kỳ mạnh mẽ - Ưu tiên Tên hơn ID
       const extractRole = (data) => {
-        const raw = data.roleId || data.role_id || data.role;
+        const findInObj = (obj) => {
+          if (!obj) return null;
+
+          // 1. Ưu tiên các trường Tên vai trò (String) hoặc Đối tượng vai trò (Object)
+          // Vì ID đôi khi bị sai lệnh (ví dụ: 4 nhưng tên là Teacher)
+          const nameFields = ['roleName', 'role_name', 'RoleName', 'role'];
+          for (const key of nameFields) {
+            const val = obj[key];
+            if (val && (typeof val === 'object' || (typeof val === 'string' && isNaN(val)))) return val;
+          }
+
+          // 2. Sau đó mới tìm đến các ID số
+          return obj.roleId || obj.role_id || obj.Role || obj.role;
+        };
+
+        const raw = findInObj(data);
         console.log('[AUTH] Raw role field found:', JSON.stringify(raw));
 
         if (!raw) return 'Student';
 
-        // Trích xuất ID và Name từ Object hoặc Giá trị đơn
-        const id = (typeof raw === 'object') ? (raw.id || raw.roleId || 0) : raw;
-        const name = String((typeof raw === 'object') ? (raw.name || raw.code || '') : raw).toLowerCase();
+        // Normalization với hỗ trợ tiếng Việt
+        let userRoleFallback = 'Student';
+        const roleId = (typeof raw === 'object') ? (raw.id || raw.roleId || 0) : raw;
+        const roleName = String((typeof raw === 'object') ? (raw.name || raw.code || '') : (raw || '')).toLowerCase();
 
-        console.log(`[AUTH] Normalized role details -> ID: ${id}, Name: ${name}`);
+        console.log(`[AUTH] Normalizing role -> Final ID: ${roleId}, Final Name: ${roleName}`);
 
-        if (id == 1 || id === '1' || name.includes('admin')) return 'Admin';
-        if (id == 3 || id === '3' || name.includes('teacher')) return 'Teacher';
-        if (id == 2 || id === '2' || name.includes('manager')) return 'Manager';
-        return 'Student';
+        // KIỂM TRA THEO TÊN TRƯỚC (Vì tên thường chính xác hơn ID trong TH mâu thuẫn)
+        if (roleName.includes('admin') || roleName.includes('quản trị')) return 'Admin';
+        if (roleName.includes('teacher') || roleName.includes('giáo viên') || roleName.includes('giảng viên')) return 'Teacher';
+        if (roleName.includes('manager') || roleName.includes('quản lý')) return 'Manager';
+        if (roleName.includes('student') || roleName.includes('sinh viên') || roleName.includes('học viên')) return 'Student';
+
+        // KIỂM TRA THEO ID NẾU TÊN KHÔNG RÕ RÀNG
+        if (roleId == 1 || roleId === '1') return 'Admin';
+        if (roleId == 3 || roleId === '3') return 'Teacher';
+        if (roleId == 2 || roleId === '2') return 'Manager';
+        if (roleId == 4 || roleId === '4') return 'Student';
+
+        return userRoleFallback;
       };
 
       const uRole = extractRole(userData);
       console.log('[AUTH] Auto-login finalized role:', uRole);
 
+      setUserData(userData);
       setUserRole(uRole);
       setActiveTab(uRole.toLowerCase());
       setIsAuthenticated(true);
     } catch (error) {
-      console.error('Auto login failed', error);
+      if (error.response?.status === 401) {
+        console.log('[AUTH] Auto-login: Token expired or invalid');
+      } else {
+        console.error('[AUTH] Auto-login failed with unexpected error:', error);
+      }
       await AsyncStorage.removeItem('token');
     } finally {
       setIsAuthLoading(false);
     }
   };
 
-  const handleLoginSuccess = (role) => {
-    console.log('[AUTH] Login Success handler received raw role:', JSON.stringify(role));
+  const handleLoginSuccess = (normalizedRole, fullUserData) => {
+    console.log('[AUTH] Login Success handler received final role:', normalizedRole);
 
-    // Đảm bảo role được chuẩn hóa lần cuối
-    let normalizedRole = 'Student';
-    const roleStr = String(role || '').toLowerCase();
-
-    // Check cả ID number, ID string và Name
-    if (role == 1 || role === '1' || roleStr.includes('admin')) {
-      normalizedRole = 'Admin';
-    } else if (role == 3 || role === '3' || roleStr.includes('teacher')) {
-      normalizedRole = 'Teacher';
-    } else if (role == 2 || role === '2' || roleStr.includes('manager')) {
-      normalizedRole = 'Manager';
-    }
-
-    console.log('[AUTH] Login Success normalized to:', normalizedRole);
+    // Simple assignment as it's already normalized by LoginScreen
     setIsAuthenticated(true);
     setUserRole(normalizedRole);
-    setActiveTab(normalizedRole.toLowerCase());
+    setUserData(fullUserData);
+
+    // Set default tab based on role
+    if (normalizedRole === 'Admin') setActiveTab('admin');
+    else if (normalizedRole === 'Teacher') setActiveTab('teacher_courses');
+    else setActiveTab('student');
   };
 
   const handleLogout = async () => {
@@ -106,22 +131,37 @@ export default function App() {
   };
 
   const renderContent = () => {
-    console.log('[DEBUG] Rendering Content for Tab:', activeTab, 'Role:', userRole);
+    const role = String(userRole || '').toLowerCase();
+    const tab = String(activeTab || '').toLowerCase();
 
-    switch (activeTab) {
-      case 'admin':
-        return <AdminDashboard />;
-      case 'profile':
-        return <ProfileScreen />;
+    console.log('[DEBUG] Rendering Content -> Role:', role, 'Tab:', tab);
+
+    // 1. Check Profile first
+    if (tab === 'profile') return <ProfileScreen />;
+
+    // 2. Role-based Dashboards
+    if (role === 'admin') {
+      return <AdminDashboard />;
+    }
+
+    if (role === 'teacher') {
+      switch (tab) {
+        case 'teacher_classes':
+          return <TeacherClassesScreen user={userData} />;
+        case 'teacher_courses':
+        default:
+          return <TeacherCoursesScreen user={userData} />;
+      }
+    }
+
+    // 3. Student / Default
+    switch (tab) {
       case 'student_courses':
         return <StudentCoursesScreen />;
       case 'student_tests':
-        // Placeholder or actual component when ready
         return <View className="flex-1 justify-center items-center"><Text className="text-gray-500 font-bold">Trang Bài kiểm tra đang phát triển</Text></View>;
       case 'student_progress':
-        // Placeholder or actual component when ready
         return <View className="flex-1 justify-center items-center"><Text className="text-gray-500 font-bold">Trang Tiến độ đang phát triển</Text></View>;
-      case 'student':
       default:
         return <StudentDashboard />;
     }

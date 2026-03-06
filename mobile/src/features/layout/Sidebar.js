@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, Dimensions, TouchableWithoutFeedback } from 'react-native';
-import { Home, User, BookOpen, LogOut, X, Shield, GraduationCap, FileText, TrendingUp } from 'lucide-react-native';
+import { Home, User, BookOpen, LogOut, X, Shield, GraduationCap, FileText, TrendingUp, Users, Presentation } from 'lucide-react-native';
 import { cn } from '../../lib/utils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -49,6 +49,9 @@ export const Sidebar = ({ isOpen, onClose, activeTab, onNavigate, onLogout, user
 
         if (role === 'admin') {
             items.push({ key: 'admin', label: 'Bảng điều khiển', icon: Shield });
+        } else if (role === 'teacher') {
+            items.push({ key: 'teacher_courses', label: 'Quản lý Khóa học', icon: BookOpen });
+            items.push({ key: 'teacher_classes', label: 'Quản lý Lớp học', icon: Users });
         } else {
             items.push({ key: 'student', label: 'Tổng quan', icon: Home });
             items.push({ key: 'student_courses', label: 'Khóa học', icon: BookOpen });

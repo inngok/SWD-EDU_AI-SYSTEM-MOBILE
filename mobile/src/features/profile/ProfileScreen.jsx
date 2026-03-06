@@ -40,10 +40,19 @@ export const ProfileScreen = () => {
         );
     }
 
-    // Convert role integer to display text
-    const roleValue = profile.roleId || profile.role_id || profile.role;
+    // Convert role data to display text
+    const rawRole = profile.role || profile.roleId || profile.role_id || profile.roleName;
+    const roleId = (typeof rawRole === 'object') ? (rawRole.id || rawRole.roleId || 0) : rawRole;
+    const roleName = String((typeof rawRole === 'object') ? (rawRole.name || rawRole.code || '') : (rawRole || '')).toLowerCase();
+
     let roleText = 'Học viên';
-    if (roleValue === 1 || String(roleValue).toLowerCase() === 'admin') roleText = 'Quản trị viên';
+    if (roleId == 1 || roleName.includes('admin')) {
+        roleText = 'Quản trị viên';
+    } else if (roleId == 3 || roleName.includes('teacher')) {
+        roleText = 'Giáo viên';
+    } else if (roleId == 2 || roleName.includes('manager')) {
+        roleText = 'Quản lý';
+    }
 
     return (
         <ScrollView className="flex-1 bg-gray-50 p-4">

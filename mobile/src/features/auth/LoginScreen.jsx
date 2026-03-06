@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Lock, User, Eye, EyeOff, GraduationCap } from 'lucide-react-native';
 import { cn } from '../../lib/utils';
 import { authApi } from './api/auth-api';
+import { userApi } from '../profile/api/user-api';
 
 export const LoginScreen = ({ onLoginSuccess }) => {
     const [username, setUsername] = useState('');
@@ -24,34 +25,76 @@ export const LoginScreen = ({ onLoginSuccess }) => {
                 password: password,
             });
 
-
-
-            // Backend returns response.data which we get as `data` here.
-            // Some backends might wrap the payload inside `{ data: ... }`
+            // Backend returns response.data which we get as `data` here (from axios interceptor)
             const responseData = data.data || data;
-            const roleRaw = responseData.role || responseData.roleId || responseData.role_id;
-
             const token = responseData.token || responseData.accessToken || responseData.access_token || responseData.Token;
 
             if (token) {
                 await AsyncStorage.setItem('token', token);
             }
 
-            // Extract role name or ID carefully
-            let userRole = 'Student';
-            const roleId = (typeof roleRaw === 'object') ? (roleRaw.id || roleRaw.roleId) : roleRaw;
-            const roleName = (typeof roleRaw === 'object') ? (roleRaw.name || roleRaw.code) : String(roleRaw);
+            // A helper to find role in nested response
+            const findRoleInObject = (obj) => {
+                if (!obj) return null;
 
-            if (roleId === 1 || String(roleName).toLowerCase().includes('admin')) {
-                userRole = 'Admin';
-            } else if (roleId === 3 || String(roleName).toLowerCase().includes('teacher')) {
-                userRole = 'Teacher';
-            } else if (roleId === 2 || String(roleName).toLowerCase().includes('manager')) {
-                userRole = 'Manager';
+                // 1. Ưu tiên các trường Tên vai trò (String) hoặc Đối tượng vai trò (Object)
+                const nameKeys = ['roleName', 'role_name', 'RoleName', 'role'];
+                for (const key of nameKeys) {
+                    const val = obj[key];
+                    if (val && (typeof val === 'object' || (typeof val === 'string' && isNaN(val)))) return val;
+                }
+
+                // 2. Tìm sâu trong user hoặc data
+                if (obj.user) return findRoleInObject(obj.user);
+                if (obj.data && obj.data !== obj) return findRoleInObject(obj.data);
+
+                // 3. Cuối cùng mới lấy ID đơn thuần
+                return obj.roleId || obj.role_id || obj.role || obj.Role;
+            };
+
+            let roleRaw = findRoleInObject(responseData);
+
+            // CRITICAL FALLBACK: If login SUCCESS but NO ROLE found, fetch from /users/me
+            if (!roleRaw && token) {
+                try {
+                    console.log('[AUTH] Role not found in login response, fetching profile for verification...');
+                    const profileRes = await userApi.getCurrentUser();
+                    const profileData = profileRes.data || profileRes;
+                    roleRaw = findRoleInObject(profileData);
+                    console.log('[AUTH] Profile fetch result role:', JSON.stringify(roleRaw));
+                } catch (profileError) {
+                    console.error('[AUTH] Failed to fetch profile after login:', profileError);
+                }
             }
 
-            console.log('[AUTH] Login detected role:', userRole, 'from raw:', JSON.stringify(roleRaw));
-            onLoginSuccess(userRole);
+            // Normalization thông minh - Ưu tiên Tên hơn ID
+            const roleId = (typeof roleRaw === 'object') ? (roleRaw.id || roleRaw.roleId || 0) : roleRaw;
+            const roleName = String((typeof roleRaw === 'object') ? (roleRaw.name || roleRaw.code || '') : (roleRaw || '')).toLowerCase();
+
+            console.log(`[AUTH] Normalizing login role -> ID: ${roleId}, Name: ${roleName}`);
+
+            let userRoleFallback = 'Student';
+
+            // Ưu tiên kiểm tra Tên trước
+            if (roleName.includes('admin') || roleName.includes('quản trị')) {
+                userRoleFallback = 'Admin';
+            } else if (roleName.includes('teacher') || roleName.includes('giáo viên') || roleName.includes('giảng viên')) {
+                userRoleFallback = 'Teacher';
+            } else if (roleName.includes('manager') || roleName.includes('quản lý')) {
+                userRoleFallback = 'Manager';
+            } else if (roleName.includes('student') || roleName.includes('sinh viên') || roleName.includes('học viên')) {
+                userRoleFallback = 'Student';
+            }
+            // Nếu tên không rõ ràng, mới dùng ID
+            else {
+                if (roleId == 1 || roleId === '1') userRoleFallback = 'Admin';
+                else if (roleId == 3 || roleId === '3') userRoleFallback = 'Teacher';
+                else if (roleId == 2 || roleId === '2') userRoleFallback = 'Manager';
+                else if (roleId == 4 || roleId === '4') userRoleFallback = 'Student';
+            }
+
+            console.log('[AUTH] Login finalized role:', userRoleFallback, 'from raw:', JSON.stringify(roleRaw));
+            onLoginSuccess(userRoleFallback, responseData);
 
         } catch (error) {
             console.error(error);
